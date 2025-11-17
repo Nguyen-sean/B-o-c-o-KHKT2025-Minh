@@ -1,277 +1,215 @@
-# Hệ Thống Phát Hiện & Cảnh Báo Cháy
+Hệ Thống Phát Hiện & Cảnh Báo Cháy Cho Người Khiếm Thính/Khiếm Thanh
 
-Hệ thống phát hiện cháy phân tán được xây dựng trên các vi điều khiển ESP32 sử dụng MicroPython và giao tiếp không dây ESP-NOW. Hệ thống theo dõi 8 khu vực phát hiện cháy và gửi cảnh báo theo thời gian thực với cảnh báo rung động/LED.
+ESP32 – MicroPython – ESP-NOW – Real-Time Alerting System
 
-## 🏗️ Kiến Trúc Hệ Thống
+1. Giới thiệu
 
-### Các Thành Phần
+Dự án xây dựng hệ thống cảnh báo cháy phân tán dựa trên ESP32, nhằm hỗ trợ người khiếm thính/khiếm thanh bằng cách cung cấp cảnh báo rung và đèn LED thời gian thực.
+Hệ thống lấy tín hiệu trực tiếp từ tủ báo cháy qua mạch cách ly PC817, xử lý bằng ESP32-C3 và phát cảnh báo qua giao thức ESP-NOW.
 
-**TX (Nút Phát Tín Hiệu)**
-- Theo dõi 8 khu vực phát hiện cháy qua các chân GPIO
-- Gửi cảnh báo cháy qua phát sóng ESP-NOW
-- Thực hiện logic xác nhận hết cháy trong 10 giây
-- Ghi lại sự kiện cháy vào bộ nhớ
-- Bảo vệ watchdog 20 giây
+Hệ thống bao gồm hai thiết bị:
 
-**RX (Nút Thu Tín Hiệu)**
-- Nhận cảnh báo cháy và cập nhật trạng thái
-- Kích hoạt mô hình rung động SOS qua động cơ rung
-- Đèn LED chỉ báo đồng bộ
-- Quản lý năng lượng hai chế độ:
-  - **Chế độ USB**: Hoạt động liên tục khi được cấp điện
-  - **Chế độ Pin**: Tối ưu hóa ngủ sâu với chu kỳ thức dậy
+TX (Transmitter): Đọc 8 zone báo cháy từ tủ trung tâm, xử lý và phát cảnh báo.
 
-## 🔧 Yêu Cầu Phần Cứng
+RX (Receiver): Thiết bị đeo tay/thiết bị phụ trợ nhận cảnh báo và tạo rung/đèn.
 
-### Nút TX
-- Vi điều khiển ESP32
-- 8 cảm biến phát hiện cháy (GPIO 4-7, 0-3)
-- Cấu hình đầu vào active-low với pull-up
-- MicroPython ≥1.22
+2. Kiến trúc hệ thống
+2.1. TX – Bộ phát cảnh báo
 
-### Nút RX
-- Vi điều khiển ESP32-C6 (hoặc ESP32 tương thích)
-- Động cơ rung động (GPIO 17)
-- Đèn LED chỉ báo (GPIO 10)
-- Giám sát điện áp pin (ADC Pin 0)
-- Phát hiện VBUS USB (ADC Pin 1)
-- MicroPython ≥1.22
+Đọc tín hiệu báo cháy từ 8 zone (mức active-low).
 
-## 📡 Giao Thức Giao Tiếp
+Sử dụng 8 module PC817 để chuyển 24V → 3.3V an toàn.
 
-### Cấu Hình ESP-NOW
-- **Kênh**: Cố định ở kênh 1 cho cả hai nút
-- **Địa chỉ Phát Sóng**: `FF:FF:FF:FF:FF:FF`
-- **Độ Trễ**: Siêu thấp (chế độ phát sóng)
+Gửi cảnh báo bằng ESP-NOW (broadcast).
 
-### Định Dạng Thông Điệp TX → RX
-```json
+Lưu nhật ký vào fire_log.txt.
+
+Xác nhận trạng thái hết cháy sau 10 giây.
+
+Tự động phục hồi bằng watchdog.
+
+2.2. RX – Bộ nhận cảnh báo
+
+Nhận gói tin cảnh báo từ TX bằng ESP-NOW.
+
+Tạo rung động theo mô hình SOS bằng động cơ rung.
+
+Nháy LED đồng bộ với mô hình rung.
+
+Hai chế độ hoạt động:
+
+USB mode: chạy liên tục.
+
+Battery mode: deep sleep tiết kiệm năng lượng.
+
+Giám sát điện áp pin và trạng thái USB bằng ADC.
+
+3. Phần cứng
+3.1. Mạch cách ly PC817
+
+Tín hiệu báo cháy 24V được chuyển thành mức 3.3V theo cách ly bằng PC817 để đảm bảo an toàn.
+Sơ đồ mạch mỗi zone:
+
+Input_24V → R3 (3KΩ) → PC817 → R4 (10KΩ pull-up 3.3V) → GPIO ESP32
+
+
+Lợi ích:
+
+Cách ly hoàn toàn giữa tủ báo cháy và ESP32.
+
+Không gây ảnh hưởng đến đường giám sát (supervision).
+
+Chống nhiễu, chống xung điện.
+
+3.2. Bo mạch 8-zone
+
+8 module PC817 hoạt động độc lập.
+
+ESP32-C3 đặt tại trung tâm bo.
+
+Đầu nối screw-terminal cho 8 zone vào.
+
+Mạch cách ly và nguồn được thiết kế an toàn 24/7.
+
+4. Truyền thông ESP-NOW
+
+Độ trễ thấp: 5–20 ms.
+
+Không cần Wi-Fi hoặc router.
+
+Truyền broadcast nhiều thiết bị cùng lúc.
+
+Ổn định trong môi trường có nhiều vật cản.
+
+TX sử dụng địa chỉ broadcast:
+
+FF:FF:FF:FF:FF:FF
+
+5. Định dạng thông điệp
+5.1. Gói TX gửi → RX
 {
   "rtc": [2025, 11, 18, 14, 30, 45, 0, 0],
-  "zones": [0, 1, 0, 1, 0, 0, 0, 0],
-  "alerts": [2, 4]
+  "zones": [0,1,0,1,0,0,0,0],
+  "alerts": [2,4]
 }
-```
-- `zones`: Mảng 8 giá trị nhị phân (1 = phát hiện cháy)
-- `alerts`: Danh sách số khu vực đang hoạt động (1-8)
 
-### Nhịp Tim/Xác Nhận RX → TX
-```json
+
+zones: trạng thái 8 khu vực (0 = bình thường, 1 = cháy).
+
+alerts: danh sách zone đang cháy.
+
+5.2. Gói RX gửi → TX (heartbeat)
 {
   "mac": "aabbccddeeff",
   "battery": 3.45,
   "mode": "active",
   "rtc": 1734624645
 }
-```
 
-## 🚀 Cài Đặt & Triển Khai
-
-### 1. Flash MicroPython
-Tải MicroPython ≥1.22 cho biến thể ESP32 của bạn và flash:
-```bash
+6. Cài đặt
+6.1. Flash MicroPython
 esptool.py -p COM3 erase_flash
 esptool.py -p COM3 write_flash -z 0x1000 firmware.bin
-```
 
-### 2. Tải Mã
-Chuyển các tệp tới thiết bị:
-```
-CODE/
-  ├── TX.py    → Flash tới nút TX
-  └── RX.py    → Flash tới nút RX
-```
+6.2. Tải mã nguồn
+TX.py → Thiết bị TX
+RX.py → Thiết bị RX
 
-### 3. Khởi Động & Giám Sát
-Kết nối cổng nối tiếp và kiểm tra đầu ra:
-```
-✅ TX MAC: a1b2c3d4e5f6
-✅ RX MAC: f6e5d4c3b2a1
-```
+7. Cấu hình
+7.1. TX.py
+Tham số	Mô tả
+ZONE_PINS	GPIO đọc 8 zone
+SEND_INTERVAL_MS	Chu kỳ gửi cảnh báo (200ms)
+CLEAR_CONFIRM_MS	Xác nhận hết cháy (10s)
+CHANNEL	Kênh ESP-NOW (1)
+7.2. RX.py
+Tham số	Mô tả
+ALERT_HOLD_MS	Thức 5 phút khi đang cháy
+CLEAR_WAIT_MS	Thức 2 phút khi hết cháy
+LISTEN_TIME_MS	Lắng nghe tối thiểu
+SLEEP_TIME_MS	Chu kỳ deep sleep
+VBUS_CHECK_MS	Kiểm tra trạng thái USB
+8. Hành vi hệ thống
+8.1. TX
 
-## ⚙️ Cấu Hình
+Khi phát hiện cháy:
 
-### Nút TX (`TX.py`)
+Gửi cảnh báo mỗi 200 ms.
 
-| Tham Số | Giá Trị | Mục Đích |
-|---------|--------|---------|
-| `ZONE_PINS` | `[4,5,6,7,0,1,2,3]` | Các chân GPIO cho 8 khu vực |
-| `SEND_INTERVAL_MS` | 200 | Tần suất phát sóng cảnh báo cháy |
-| `CLEAR_CONFIRM_MS` | 10000 | Độ ổn định cần thiết trước khi xóa cháy (10s) |
-| `CHANNEL` | 1 | Kênh WiFi cho ESP-NOW |
+Gửi danh sách zone đang cháy.
 
-**Sửa Đổi Khu Vực:**
-```python
-ZONE_PINS = [4, 5, 6, 7, 0, 1, 2, 3, 15, 16]  # Ví dụ 10 khu vực
-# Số khu vực = chỉ số + 1 (không bao giờ là Khu Vực 0)
-```
+Khi hết cháy: đợi 10 giây.
 
-### Nút RX (`RX.py`)
+Ghi "CLEAR" vào fire_log.txt.
 
-| Tham Số | Giá Trị | Mục Đích |
-|---------|--------|---------|
-| `ALERT_HOLD_MS` | 300000 | Thức dậy 5 phút trong lúc cháy |
-| `CLEAR_WAIT_MS` | 120000 | Thức dậy 2 phút sau khi cháy kết thúc |
-| `LISTEN_TIME_MS` | 2000 | Thời gian thức dậy tối thiểu trước khi cho phép ngủ |
-| `SLEEP_TIME_MS` | 20000 | Khoảng thời gian ngủ sâu (20s) |
-| `VBUS_CHECK_MS` | 1000 | Tần suất kiểm tra USB |
+Khi không cháy:
 
-**Điều Chỉnh Thời Gian Thức Dậy:**
-```python
-ALERT_HOLD_MS = 10 * 60 * 1000   # 10 phút trong lúc cảnh báo
-CLEAR_WAIT_MS = 5 * 60 * 1000    # 5 phút sau khi xóa
-```
+Gửi heartbeat mỗi 1 giây.
 
-## 🔄 Chế Độ Hoạt Động
+8.2. RX
 
-### Hành Vi TX
+USB mode:
 
-**Phát Hiện Cháy** (Chân Zone = LOW)
-```
-1. Ngay lập tức phát sóng cảnh báo với danh sách khu vực mỗi 200ms
-2. Tiếp tục gửi khi cháy vẫn còn
-3. Ghi vào fire_log.txt khi cuối cùng hết cháy
-```
+Hoạt động liên tục.
 
-**Hết Cháy** (Tất cả Chân Zone = HIGH)
-```
-1. Chờ 10 giây xác nhận độ ổn định
-2. Nếu cháy tiếp → khởi động lại bộ đếm
-3. Nếu 10s qua → gửi mảng cảnh báo trống
-4. Thêm "HH:MM:SS CLEAR" vào fire_log.txt
-```
+Rung và nháy LED ngay lập tức.
 
-**Nhịp Tim** (Không Có Cháy)
-```
-1. Gửi zones/alerts trống mỗi 1 giây
-2. Giữ liên kết giao tiếp hoạt động
-3. Cho phép RX phát hiện TX ngoại tuyến
-```
+Battery mode:
 
-### Hành Vi RX - Chế Độ USB
-- Được cấp điện qua cáp USB
-- Hoạt động liên tục
-- Phản ứng cảnh báo tức thì
-- Rung động SOS khi cảnh báo cháy
-- Thoát khi rút USB
+Deep sleep 20 giây → Thức 2 giây để nhận → ngủ lại.
 
-### Hành Vi RX - Chế Độ Pin
-- Ngủ sâu giữa các chu kỳ lắng nghe
-- Thức dậy mỗi 20 giây
-- Lắng nghe 2 giây mỗi chu kỳ
-- **Giai Đoạn Cảnh Báo**: Thức dậy tối thiểu 5 phút
-- **Giai Đoạn Xóa**: Thức dậy thêm 2 phút
-- Quay lại ngủ sau khi ổn định
+Khi cháy: thức 5 phút.
 
-## 📊 Mô Hình Rung Động (SOS)
+Khi hết cháy: thức 2 phút trước khi ngủ lại.
 
-RX phát mã Morse SOS qua động cơ rung:
-```
-. . . - - - . . .
-(3 ngắn, 3 dài, 3 ngắn)
+9. Mã rung SOS
 
-Thời gian: [200,200,200,200,200,600,200,600,200,600,200,200,200,200,200] ms
-```
+Dạng Morse:
 
-Mô hình lặp liên tục cho đến khi cháy kết thúc.
+... --- ...
 
-## 🔋 Quản Lý Năng Lượng (RX)
 
-### Giám Sát Pin
-- **ADC Pin 0**: Điện áp pin (tỷ lệ chia 2.0, scale 1.05, FS 3.9V)
-- **ADC Pin 1**: Phát hiện VBUS (ngưỡng 4.0V cho sự hiện diện USB)
+Thời gian rung:
 
-### Chiến Lược Ngủ Sâu
-```
-USB Kết Nối → Chế Độ Liên Tục
-        ↓
-    Cảnh Báo Cháy
-        ↓
-    Rung SOS + Thức Dậy 5 phút
-        ↓
-    Cháy Kết Thúc
-        ↓
-    Thức Dậy 2 phút nữa → Sau Đó Ngủ 20s
-```
+[200,200,200, 600,600,600, 200,200,200] ms
 
-## 📝 Ghi Nhật Ký
+10. Quản lý năng lượng
 
-Nút TX tạo `fire_log.txt` với dấu thời gian xóa:
-```
-14:30:45 CLEAR
-14:35:12 CLEAR
-14:45:08 CLEAR
-```
+ADC0: đo điện áp pin.
 
-Hữu ích cho việc kiểm toán lịch sử sự kiện cháy.
+ADC1: phát hiện USB 5V.
 
-## 🐛 Khắc Phục Sự Cố
+Chuyển đổi tự động USB ↔ Pin.
 
-| Sự Cố | Giải Pháp |
-|-------|----------|
-| Rung RX không hoạt động khi cháy | Kiểm tra danh sách cảnh báo không trống trong phát sóng TX |
-| RX không ngủ trong chế độ pin | Xác minh `LISTEN_TIME_MS` < thời gian giữ cảnh báo |
-| Wifi reset thất bại | Tăng sleep_ms delay sau các lệnh `sta.active()` |
-| Trạng thái mô hình bị gãy | Đừng tạo lại từ điển `sos_state` giữa mô hình |
-| Số khu vực sai | Nhớ: Khu Vực = chỉ số + 1 (Khu Vực 1-8, không bao giờ là 0) |
-| Lỗi ghi tệp | TX im lặng bỏ qua nếu SD không gắn |
+Chế độ Deep sleep tối ưu hóa thời gian sử dụng.
 
-## 🔐 Logic Active-Low
+11. Cấu trúc dự án
+/
+├── CODE/
+│   ├── TX.py
+│   └── RX.py
+└── README.md
 
-**QUAN TRỌNG**: Cảm biến cháy là active-LOW:
-- **Cảm biến kích hoạt** → GPIO chuyển sang LOW (0)
-- **Trong mã**: `pin.value() == 0` → `zones[i] = 1`
-- **Khu vực hoạt động**: Chỉ các chỉ số khác không xuất hiện trong cảnh báo
+12. Mẹo phát triển
+Thêm zone mới
+ZONE_PINS = [4,5,6,7,0,1,2,3,15,16]
 
-Ví dụ:
-```python
-# Nếu GPIO 4 (Khu Vực 1) có cháy:
-zones = [1, 0, 0, 0, 0, 0, 0, 0]
-alerts = [1]  # Khu Vực 1 đang hoạt động
-
-# Nếu GPIO 5 (Khu Vực 2) cũng có cháy:
-zones = [1, 1, 0, 0, 0, 0, 0, 0]
-alerts = [1, 2]  # Khu Vực 1 & 2 đang hoạt động
-```
-
-## 📚 Cấu Trúc Tệp
-
-```
-CODE/
-├── TX.py              # Nút phát (phát hiện cháy & phát sóng)
-└── RX.py              # Nút thu (cảnh báo & điều khiển rung)
-
-.github/
-└── copilot-instructions.md  # Hướng dẫn phát triển cho tác nhân AI
-```
-
-## 🛠️ Mẹo Phát Triển
-
-### Thêm Khu Vực Mới
-1. Mở rộng mảng `ZONE_PINS` trong TX.py
-2. Số khu vực tự động suy ra: pin mới = khu vực N+1
-3. RX xử lý động theo bất kỳ số lượng cảnh báo nào
-
-### Kiểm Tra Mà Không Có Phần Cứng
-Mô phỏng `machine.Pin()` và `machine.ADC()` để trả về giá trị cố định:
-```python
+Mô phỏng không có phần cứng
 class MockPin:
-    def __init__(self, num, mode, pull=None):
-        self.value_state = 0
-    def value(self, val=None):
-        return self.value_state
-    def on(self): pass
-    def off(self): pass
-```
+    def value(self): return 0
 
-### Gỡ Lỗi Giao Tiếp
-Thêm vào RX để xác minh thông điệp đến:
-```python
+Gỡ lỗi RX
 host, msg = e.recv(300)
-if msg:
-    print("Nhận được:", msg)
-    data = ujson.loads(msg)
-    print("Cảnh báo:", data.get("alerts"))
-```
+print(msg)
 
+13. Mục tiêu dự án
 
+Hỗ trợ người khiếm thính/khiếm thanh.
+
+Độ trễ cảnh báo dưới 1 giây.
+
+An toàn tuyệt đối với tủ báo cháy (chỉ đọc, không can thiệp).
+
+Chi phí thấp, dễ lắp đặt, dễ mở rộng.
+
+Vận hành 24/7.
